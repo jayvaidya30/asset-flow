@@ -2,8 +2,13 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { handle, fail, ok } from "@/lib/api";
 import { logActivity } from "@/lib/activity";
-import { listAssets, nextAssetTag, parseAssetFilters } from "@/lib/assets";
+import { listAssets, countAssets, nextAssetTag, parseAssetFilters } from "@/lib/assets";
 import { requireAuth, requireRole } from "@/lib/rbac";
+
+const paginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
 
 const optionalText = (max = 255) =>
   z.preprocess(
@@ -47,10 +52,25 @@ const createAssetSchema = z.object({
 export const GET = handle(async (req) => {
   await requireAuth();
 
-  const filters = parseAssetFilters(new URL(req.url).searchParams);
-  const assets = await listAssets(filters);
+  const url = new URL(req.url);
+  const filters = parseAssetFilters(url.searchParams);
+  const { page, pageSize } = paginationSchema.parse(
+    Object.fromEntries(url.searchParams)
+  );
+  const skip = (page - 1) * pageSize;
 
-  return ok({ assets });
+  const [assets, total] = await Promise.all([
+    listAssets(filters, { skip, take: pageSize }),
+    countAssets(filters),
+  ]);
+
+  return ok({
+    assets,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+  });
 });
 
 export const POST = handle(async (req) => {

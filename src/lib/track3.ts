@@ -7,6 +7,7 @@ import {
   Role,
   Prisma,
 } from "@prisma/client";
+import { cache } from "react";
 import { z } from "zod";
 import { logActivity } from "@/lib/activity";
 import { canTransition, transitionAsset } from "@/lib/asset-status";
@@ -90,12 +91,18 @@ const UNMAINTAINABLE_ASSET_STATES: AssetStatus[] = [AssetStatus.DISPOSED, AssetS
 const DISCREPANCY_RESULTS: AuditResult[] = [AuditResult.MISSING, AuditResult.DAMAGED];
 const AUDIT_OVERVIEW_ROLES: Role[] = [Role.ADMIN, Role.ASSET_MANAGER];
 
-async function runTransaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+async function runTransaction<T>(
+  work: (tx: Prisma.TransactionClient) => Promise<T>,
+  opts?: { isolation?: Prisma.TransactionIsolationLevel; maxRetries?: number }
+) {
+  const maxRetries = opts?.maxRetries ?? 3;
+  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
     try {
-      return await prisma.$transaction(work, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      return await prisma.$transaction(work, {
+        isolationLevel: opts?.isolation ?? Prisma.TransactionIsolationLevel.ReadCommitted,
+      });
     } catch (error) {
-      if (attempt < 2 && typeof error === "object" && error && "code" in error && error.code === "P2034") continue;
+      if (attempt < maxRetries - 1 && typeof error === "object" && error && "code" in error && error.code === "P2034") continue;
       throw error;
     }
   }
@@ -116,8 +123,7 @@ export async function syncBookingStatuses(now = new Date()) {
   });
 }
 
-export async function listBookings(assetId?: string) {
-  await syncBookingStatuses();
+export async function listBookings(assetId?: string, opts?: { skip?: number; take?: number }) {
   return prisma.booking.findMany({
     where: assetId ? { assetId } : undefined,
     include: {
@@ -126,17 +132,18 @@ export async function listBookings(assetId?: string) {
       department: { select: { id: true, name: true } },
     },
     orderBy: { startTime: "asc" },
-    take: 300,
+    skip: opts?.skip ?? 0,
+    take: opts?.take ?? 50,
   });
 }
 
-export async function getManagedDepartmentIds(session: SessionPayload) {
+export const getManagedDepartmentIds = cache(async (session: SessionPayload): Promise<string[]> => {
   const employee = await prisma.employee.findUniqueOrThrow({
     where: { id: session.sub },
     select: { departmentId: true, headedDepartments: { select: { id: true } } },
   });
   return [...new Set([employee.departmentId, ...employee.headedDepartments.map((department) => department.id)].filter(Boolean))] as string[];
-}
+});
 
 async function bookingDepartmentId(session: SessionPayload, requestedDepartmentId?: string) {
   const employee = await prisma.employee.findUniqueOrThrow({
@@ -188,7 +195,6 @@ async function ensureNoBookingOverlap(
 }
 
 export async function createBooking(session: SessionPayload, input: z.infer<typeof bookingCreateSchema>) {
-  await syncBookingStatuses();
   if (input.startTime <= new Date()) throw new Track3Error("Bookings must start in the future.", 422);
   const departmentId = await bookingDepartmentId(session, input.departmentId);
   return runTransaction(async (tx) => {
@@ -208,7 +214,7 @@ export async function createBooking(session: SessionPayload, input: z.infer<type
     });
     await logActivity(session.sub, "BOOKING_CREATED", "Booking", booking.id, { assetTag: asset.assetTag }, tx);
     return booking;
-  });
+  }, { isolation: "Serializable" });
 }
 
 export async function updateBooking(
@@ -216,7 +222,6 @@ export async function updateBooking(
   bookingId: string,
   input: z.infer<typeof bookingUpdateSchema>
 ) {
-  await syncBookingStatuses();
   const booking = await assertBookingCanBeManaged(session, bookingId);
   if (input.action === "cancel") {
     if (!CANCELLABLE_BOOKING_STATES.includes(booking.status)) {
@@ -413,7 +418,12 @@ export async function closeAuditCycle(session: SessionPayload, cycleId: string) 
       if (!canTransition(item.asset.status, AssetStatus.LOST)) {
         throw new Track3Error(`${item.asset.assetTag} cannot be marked lost from its current status.`, 409);
       }
-      await transitionAsset(item.assetId, AssetStatus.LOST, { actorId: session.sub, reason: `Audit cycle ${cycle.name}`, tx });
+      await transitionAsset(item.assetId, AssetStatus.LOST, {
+        actorId: session.sub,
+        reason: `Audit cycle ${cycle.name}`,
+        tx,
+        currentStatus: item.asset.status,
+      });
     }
     const closed = await tx.auditCycle.update({ where: { id: cycleId }, data: { status: AuditCycleStatus.CLOSED, closedAt: new Date() } });
     const discrepancies = cycle.items.filter((item) => DISCREPANCY_RESULTS.includes(item.result)).length;
@@ -422,7 +432,10 @@ export async function closeAuditCycle(session: SessionPayload, cycleId: string) 
   });
 }
 
-export async function listMaintenanceRequests(session: SessionPayload) {
+export async function listMaintenanceRequests(
+  session: SessionPayload,
+  opts?: { skip?: number; take?: number }
+) {
   let where: Prisma.MaintenanceRequestWhereInput = {};
   if (!AUDIT_OVERVIEW_ROLES.includes(session.role)) {
     if (session.role === Role.DEPARTMENT_HEAD) {
@@ -441,11 +454,15 @@ export async function listMaintenanceRequests(session: SessionPayload) {
       approvedBy: { select: { id: true, name: true } },
     },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-    take: 200,
+    skip: opts?.skip ?? 0,
+    take: opts?.take ?? 50,
   });
 }
 
-export async function listAuditCycles(session: SessionPayload) {
+export async function listAuditCycles(
+  session: SessionPayload,
+  opts?: { skip?: number; take?: number }
+) {
   const where: Prisma.AuditCycleWhereInput = AUDIT_OVERVIEW_ROLES.includes(session.role)
     ? {}
     : { assignments: { some: { auditorId: session.sub } } };
@@ -457,7 +474,8 @@ export async function listAuditCycles(session: SessionPayload) {
       _count: { select: { items: true, assignments: true } },
     },
     orderBy: [{ status: "asc" }, { startDate: "desc" }],
-    take: 100,
+    skip: opts?.skip ?? 0,
+    take: opts?.take ?? 50,
   });
 }
 

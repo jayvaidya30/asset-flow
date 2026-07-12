@@ -49,25 +49,29 @@ export function canTransition(from: AssetStatus, to: AssetStatus): boolean {
 export async function transitionAsset(
   assetId: string,
   to: AssetStatus,
-  opts?: { actorId?: string | null; reason?: string; tx?: Prisma.TransactionClient }
+  opts?: {
+    actorId?: string | null;
+    reason?: string;
+    tx?: Prisma.TransactionClient;
+    currentStatus?: AssetStatus;
+  }
 ) {
   const client = opts?.tx ?? prisma;
-  const asset = await client.asset.findUniqueOrThrow({ where: { id: assetId } });
+  const current = opts?.currentStatus ?? (await client.asset.findUniqueOrThrow({ where: { id: assetId } })).status;
 
-  if (!canTransition(asset.status, to)) {
-    throw new InvalidTransitionError(asset.status, to);
+  if (!canTransition(current, to)) {
+    throw new InvalidTransitionError(current, to);
   }
-  if (asset.status === to) return asset;
+  if (current === to) return client.asset.findUniqueOrThrow({ where: { id: assetId } });
 
   const updated = await client.asset.update({ where: { id: assetId }, data: { status: to } });
 
-  // Log outside/inside tx as provided.
   await logActivity(
     opts?.actorId ?? null,
     "ASSET_STATUS_CHANGED",
     "Asset",
     assetId,
-    { from: asset.status, to, reason: opts?.reason },
+    { from: current, to, reason: opts?.reason },
     opts?.tx
   );
 

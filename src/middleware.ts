@@ -24,6 +24,15 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  if (session) {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-session-sub", session.sub);
+    requestHeaders.set("x-session-role", session.role);
+    requestHeaders.set("x-session-email", session.email);
+    requestHeaders.set("x-session-name", session.name);
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
   return NextResponse.next();
 }
 

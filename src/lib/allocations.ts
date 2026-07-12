@@ -40,12 +40,18 @@ export function isOverdue(expectedReturnDate: Date | null | undefined, now = new
   return !!expectedReturnDate && expectedReturnDate.getTime() < now.getTime();
 }
 
-export async function listActiveAllocations() {
+export async function listActiveAllocations(opts?: { skip?: number; take?: number }) {
   return prisma.allocation.findMany({
     where: { status: "ACTIVE" },
     include: allocationListInclude,
     orderBy: [{ expectedReturnDate: "asc" }, { allocatedAt: "desc" }],
+    skip: opts?.skip,
+    take: opts?.take,
   });
+}
+
+export async function countActiveAllocations() {
+  return prisma.allocation.count({ where: { status: "ACTIVE" } });
 }
 
 export async function findActiveAllocation(assetId: string) {

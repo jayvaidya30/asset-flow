@@ -13,6 +13,13 @@ import type { SessionPayload } from "./auth";
  *   EMPLOYEE         — view own assets, book resources, raise maintenance, request return/transfer
  */
 
+const ROLE_RANK: Record<Role, number> = {
+  ADMIN: 3,
+  ASSET_MANAGER: 2,
+  DEPARTMENT_HEAD: 1,
+  EMPLOYEE: 0,
+};
+
 export class AuthError extends Error {
   constructor(
     public readonly status: 401 | 403,
@@ -23,14 +30,22 @@ export class AuthError extends Error {
 }
 
 export function hasRole(session: SessionPayload | null, ...roles: Role[]): boolean {
-  return !!session && roles.includes(session.role);
+  if (!session) return false;
+  const roleSet = new Set(roles);
+  return roleSet.has(session.role);
+}
+
+export function hasMinRole(session: SessionPayload | null, minRole: Role): boolean {
+  if (!session) return false;
+  return ROLE_RANK[session.role] >= ROLE_RANK[minRole];
 }
 
 /** Throws AuthError if not logged in, or lacks one of the allowed roles. Returns the session. */
 export async function requireRole(...roles: Role[]): Promise<SessionPayload> {
   const session = await getSession();
   if (!session) throw new AuthError(401, "Not authenticated");
-  if (roles.length && !roles.includes(session.role)) {
+  const roleSet = new Set(roles);
+  if (roles.length && !roleSet.has(session.role)) {
     throw new AuthError(403, "Insufficient permissions");
   }
   return session;

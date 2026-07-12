@@ -6,6 +6,11 @@ import { prisma } from "@/lib/db";
 import { notifyMany } from "@/lib/notifications";
 import { hasRole, requireAuth } from "@/lib/rbac";
 
+const paginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+
 const schema = z.object({
   assetId: z.string().trim().min(1),
   toEmployeeId: z.string().trim().min(1),
@@ -20,24 +25,43 @@ const transferInclude = {
   approvedBy: { select: { id: true, name: true } },
 } as const;
 
-export const GET = handle(async () => {
+export const GET = handle(async (req) => {
   const session = await requireAuth();
-  const canViewAll = hasRole(session, "ADMIN", "ASSET_MANAGER", "DEPARTMENT_HEAD");
-  const transfers = await prisma.transfer.findMany({
-    where: canViewAll
-      ? {}
-      : {
-          OR: [
-            { requestedById: session.sub },
-            { fromEmployeeId: session.sub },
-            { toEmployeeId: session.sub },
-          ],
-        },
-    include: transferInclude,
-    orderBy: { createdAt: "desc" },
-  });
+  const url = new URL(req.url);
+  const { page, pageSize } = paginationSchema.parse(
+    Object.fromEntries(url.searchParams)
+  );
+  const skip = (page - 1) * pageSize;
 
-  return ok({ transfers });
+  const canViewAll = hasRole(session, "ADMIN", "ASSET_MANAGER", "DEPARTMENT_HEAD");
+  const where = canViewAll
+    ? {}
+    : {
+        OR: [
+          { requestedById: session.sub },
+          { fromEmployeeId: session.sub },
+          { toEmployeeId: session.sub },
+        ],
+      };
+
+  const [transfers, total] = await Promise.all([
+    prisma.transfer.findMany({
+      where,
+      include: transferInclude,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
+    }),
+    prisma.transfer.count({ where }),
+  ]);
+
+  return ok({
+    transfers,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+  });
 });
 
 export const POST = handle(async (req) => {

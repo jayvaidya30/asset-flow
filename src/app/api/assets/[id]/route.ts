@@ -12,6 +12,7 @@ export const GET = handle(async (_req, ctx) => {
       category: true,
       allocations: {
         orderBy: { allocatedAt: "desc" },
+        take: 20,
         include: {
           holder: { select: { id: true, name: true, email: true } },
           department: { select: { id: true, name: true } },
@@ -20,6 +21,7 @@ export const GET = handle(async (_req, ctx) => {
       },
       maintenanceRequests: {
         orderBy: { createdAt: "desc" },
+        take: 20,
         include: {
           raisedBy: { select: { id: true, name: true } },
           approvedBy: { select: { id: true, name: true } },

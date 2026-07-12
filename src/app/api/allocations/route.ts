@@ -1,11 +1,16 @@
 import { z } from "zod";
 import { transitionAsset } from "@/lib/asset-status";
-import { findActiveAllocation, holderLabel, listActiveAllocations } from "@/lib/allocations";
+import { findActiveAllocation, holderLabel, listActiveAllocations, countActiveAllocations } from "@/lib/allocations";
 import { handle, fail, ok } from "@/lib/api";
 import { logActivity } from "@/lib/activity";
 import { prisma } from "@/lib/db";
 import { notify } from "@/lib/notifications";
 import { requireRole } from "@/lib/rbac";
+
+const paginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
 
 const optionalDate = z.preprocess(
   (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
@@ -28,12 +33,27 @@ const schema = z
     path: ["holderId"],
   });
 
-export const GET = handle(async () => {
+export const GET = handle(async (req) => {
   await requireRole("ASSET_MANAGER", "DEPARTMENT_HEAD");
 
-  const allocations = await listActiveAllocations();
+  const url = new URL(req.url);
+  const { page, pageSize } = paginationSchema.parse(
+    Object.fromEntries(url.searchParams)
+  );
+  const skip = (page - 1) * pageSize;
 
-  return ok({ allocations });
+  const [allocations, total] = await Promise.all([
+    listActiveAllocations({ skip, take: pageSize }),
+    countActiveAllocations(),
+  ]);
+
+  return ok({
+    allocations,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+  });
 });
 
 export const POST = handle(async (req) => {
@@ -99,6 +119,7 @@ export const POST = handle(async (req) => {
       actorId: session.sub,
       reason: "allocation",
       tx,
+      currentStatus: asset.status,
     });
 
     return created;

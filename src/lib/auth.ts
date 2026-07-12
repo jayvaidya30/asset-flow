@@ -14,7 +14,7 @@ export interface SessionPayload {
 
 export async function hashPassword(plain: string): Promise<string> {
   const bcrypt = await import("bcryptjs");
-  return bcrypt.hash(plain, 10);
+  return bcrypt.hash(plain, 8);
 }
 
 export async function verifyPassword(plain: string, hash: string): Promise<boolean> {

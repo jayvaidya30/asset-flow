@@ -4,6 +4,11 @@ import { handle, fail, ok } from "@/lib/api";
 import { requireAuth, requireRole } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 
+const paginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+
 const optionalId = z.string().cuid().nullable().optional();
 
 const departmentSchema = z.object({
@@ -13,19 +18,32 @@ const departmentSchema = z.object({
   parentId: optionalId,
 });
 
-export const GET = handle(async () => {
+export const GET = handle(async (req) => {
   await requireAuth();
 
-  const departments = await prisma.department.findMany({
-    orderBy: [{ status: "asc" }, { name: "asc" }],
-    include: {
-      head: { select: { id: true, name: true, email: true, role: true } },
-      parent: { select: { id: true, name: true } },
-      _count: { select: { members: true, children: true } },
-    },
-  });
+  const url = new URL(req.url);
+  const { page, pageSize } = paginationSchema.parse(
+    Object.fromEntries(url.searchParams)
+  );
+  const skip = (page - 1) * pageSize;
 
-  return ok(departments);
+  const include = {
+    head: { select: { id: true, name: true, email: true, role: true } },
+    parent: { select: { id: true, name: true } },
+    _count: { select: { members: true, children: true } },
+  } as const;
+
+  const [departments, total] = await Promise.all([
+    prisma.department.findMany({
+      orderBy: [{ status: "asc" }, { name: "asc" }],
+      include,
+      skip,
+      take: pageSize,
+    }),
+    prisma.department.count(),
+  ]);
+
+  return ok({ departments, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });
 });
 
 export const POST = handle(async (req) => {

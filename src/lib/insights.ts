@@ -6,6 +6,7 @@ import {
   TransferStatus,
   type Prisma,
 } from "@prisma/client";
+import { cache } from "react";
 import { prisma } from "./db";
 import type { SessionPayload } from "./auth";
 
@@ -39,7 +40,7 @@ type ReportFilters = {
 
 const UPCOMING_RETURN_DAYS = 14;
 
-export async function getInsightScope(session: SessionPayload): Promise<InsightScope> {
+export const getInsightScope = cache(async (session: SessionPayload): Promise<InsightScope> => {
   if (session.role === "ADMIN" || session.role === "ASSET_MANAGER") {
     return { session, orgWide: true, departmentIds: [], employeeIds: [] };
   }
@@ -79,7 +80,7 @@ export async function getInsightScope(session: SessionPayload): Promise<InsightS
     departmentIds: [],
     employeeIds: [session.sub],
   };
-}
+});
 
 export async function getDashboardKpis(session: SessionPayload) {
   const scope = await getInsightScope(session);
@@ -140,7 +141,7 @@ export async function getDashboardKpis(session: SessionPayload) {
       },
     }),
     prisma.notification.count({ where: { userId: session.sub, isRead: false } }),
-    getActivity(session, 6),
+    getActivity(scope, 6),
   ]);
 
   return {
@@ -181,8 +182,8 @@ export async function markAllNotificationsRead(session: SessionPayload) {
   });
 }
 
-export async function getActivity(session: SessionPayload, limit = 50) {
-  const scope = await getInsightScope(session);
+export async function getActivity(scopeOrSession: InsightScope | SessionPayload, limit = 50) {
+  const scope = "orgWide" in scopeOrSession ? scopeOrSession : await getInsightScope(scopeOrSession);
   return prisma.activityLog.findMany({
     where: activityWhereForScope(scope),
     include: {
@@ -262,31 +263,52 @@ async function allocationSummaryReport(
   scope: InsightScope,
   filters: ReportFilters
 ): Promise<ReportResult> {
-  const allocations = await prisma.allocation.findMany({
-    where: {
-      ...allocationWhereForScope(scope),
-      ...dateRangeWhere("allocatedAt", filters),
-      status: AllocationStatus.ACTIVE,
-      ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
-      asset: filters.categoryId ? { categoryId: filters.categoryId } : undefined,
-    },
-    include: {
-      department: { select: { name: true } },
-      holder: { select: { name: true, department: { select: { name: true } } } },
-    },
+  const where: Prisma.AllocationWhereInput = {
+    ...allocationWhereForScope(scope),
+    ...dateRangeWhere("allocatedAt", filters),
+    status: AllocationStatus.ACTIVE,
+    ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
+    asset: filters.categoryId ? { categoryId: filters.categoryId } : undefined,
+  };
+
+  const grouped = await prisma.allocation.groupBy({
+    by: ["departmentId"],
+    where,
+    _count: { id: true },
   });
 
-  const now = new Date();
-  const grouped = new Map<string, { allocated: number; overdue: number }>();
+  const departmentIds = grouped.map((g) => g.departmentId).filter(Boolean) as string[];
+  const departments = departmentIds.length
+    ? await prisma.department.findMany({
+        where: { id: { in: departmentIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const departmentMap = new Map(departments.map((d) => [d.id, d.name]));
 
-  for (const allocation of allocations) {
-    const label =
-      allocation.department?.name ?? allocation.holder?.department?.name ?? "Unassigned department";
-    const row = grouped.get(label) ?? { allocated: 0, overdue: 0 };
-    row.allocated += 1;
-    if (allocation.expectedReturnDate && allocation.expectedReturnDate < now) row.overdue += 1;
-    grouped.set(label, row);
-  }
+  const now = new Date();
+  const overdueCounts =
+    grouped.length > 0
+      ? await prisma.allocation.groupBy({
+          by: ["departmentId"],
+          where: {
+            ...where,
+            expectedReturnDate: { lt: now },
+          },
+          _count: { id: true },
+        })
+      : [];
+  const overdueMap = new Map(
+    overdueCounts.map((o) => [o.departmentId, o._count.id])
+  );
+
+  const rows = grouped.map((g) => ({
+    department: departmentMap.get(g.departmentId ?? "") ?? "Unassigned",
+    allocated: g._count.id,
+    overdue: overdueMap.get(g.departmentId) ?? 0,
+  }));
+
+  rows.sort((a, b) => a.department.localeCompare(b.department));
 
   return {
     title: "Department Allocation Summary",
@@ -296,9 +318,7 @@ async function allocationSummaryReport(
       { key: "allocated", label: "Active allocations", align: "right" },
       { key: "overdue", label: "Overdue", align: "right" },
     ],
-    rows: [...grouped.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([department, row]) => ({ department, ...row })),
+    rows,
   };
 }
 
@@ -306,32 +326,54 @@ async function maintenanceFrequencyReport(
   scope: InsightScope,
   filters: ReportFilters
 ): Promise<ReportResult> {
-  const requests = await prisma.maintenanceRequest.findMany({
-    where: {
-      ...maintenanceWhereForScope(scope),
-      ...dateRangeWhere("createdAt", filters),
-      asset: filters.categoryId ? { categoryId: filters.categoryId } : undefined,
-    },
-    include: {
-      asset: { select: { assetTag: true, name: true, category: { select: { name: true } } } },
-    },
+  const where: Prisma.MaintenanceRequestWhereInput = {
+    ...maintenanceWhereForScope(scope),
+    ...dateRangeWhere("createdAt", filters),
+    asset: filters.categoryId ? { categoryId: filters.categoryId } : undefined,
+  };
+
+  const grouped = await prisma.maintenanceRequest.groupBy({
+    by: ["assetId"],
+    where,
+    _count: { id: true },
   });
 
-  const grouped = new Map<string, { asset: string; category: string; total: number; open: number }>();
-  for (const request of requests) {
-    const key = request.assetId;
-    const row = grouped.get(key) ?? {
-      asset: `${request.asset.assetTag} - ${request.asset.name}`,
-      category: request.asset.category.name,
-      total: 0,
-      open: 0,
+  const assetIds = grouped.map((g) => g.assetId);
+  const assets =
+    assetIds.length > 0
+      ? await prisma.asset.findMany({
+          where: { id: { in: assetIds } },
+          select: { id: true, assetTag: true, name: true, category: { select: { name: true } } },
+        })
+      : [];
+  const assetMap = new Map(assets.map((a) => [a.id, a]));
+
+  const openCounts =
+    assetIds.length > 0
+      ? await prisma.maintenanceRequest.groupBy({
+          by: ["assetId"],
+          where: {
+            ...where,
+            status: { notIn: [MaintenanceStatus.RESOLVED, MaintenanceStatus.REJECTED] },
+          },
+          _count: { id: true },
+        })
+      : [];
+  const openMap = new Map(
+    openCounts.map((o) => [o.assetId, o._count.id])
+  );
+
+  const rows = grouped.map((g) => {
+    const asset = assetMap.get(g.assetId);
+    return {
+      asset: asset ? `${asset.assetTag} - ${asset.name}` : g.assetId,
+      category: asset?.category?.name ?? "Unknown",
+      total: g._count.id,
+      open: openMap.get(g.assetId) ?? 0,
     };
-    row.total += 1;
-    if (request.status !== MaintenanceStatus.RESOLVED && request.status !== MaintenanceStatus.REJECTED) {
-      row.open += 1;
-    }
-    grouped.set(key, row);
-  }
+  });
+
+  rows.sort((a, b) => b.total - a.total);
 
   return {
     title: "Maintenance Frequency",
@@ -342,7 +384,7 @@ async function maintenanceFrequencyReport(
       { key: "total", label: "Requests", align: "right" },
       { key: "open", label: "Open", align: "right" },
     ],
-    rows: [...grouped.values()].sort((a, b) => b.total - a.total),
+    rows,
   };
 }
 
@@ -350,24 +392,60 @@ async function assetUtilizationReport(
   scope: InsightScope,
   filters: ReportFilters
 ): Promise<ReportResult> {
+  const assetWhere: Prisma.AssetWhereInput = {
+    ...assetWhereForScope(scope),
+    ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+  };
+
+  const allocDateFilter = dateRangeWhere("allocatedAt", filters);
+  const bookingDateFilter = dateRangeWhere("startTime", filters);
+
   const assets = await prisma.asset.findMany({
-    where: {
-      ...assetWhereForScope(scope),
-      ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
-    },
-    include: {
+    where: assetWhere,
+    select: {
+      assetTag: true,
+      name: true,
+      status: true,
       category: { select: { name: true } },
-      allocations: {
-        where: dateRangeWhere("allocatedAt", filters),
-        select: { id: true },
-      },
-      bookings: {
-        where: dateRangeWhere("startTime", filters),
-        select: { startTime: true, endTime: true },
+      _count: {
+        select: {
+          allocations: { where: allocDateFilter },
+          bookings: { where: bookingDateFilter },
+        },
       },
     },
     orderBy: { assetTag: "asc" },
   });
+
+  // Booking hours still need startTime/endTime for calculation, so batch-fetch
+  // only for assets that have bookings in the period
+  const assetIds = assets
+    .filter((a) => a._count.bookings > 0)
+    .map((a) => a.assetTag);
+
+  let bookingHours: Record<string, number> = {};
+  if (assetIds.length) {
+    const bookings = await prisma.booking.findMany({
+      where: {
+        ...bookingWhereForScope(scope),
+        ...bookingDateFilter,
+        asset: { assetTag: { in: assetIds } },
+      },
+      select: {
+        startTime: true,
+        endTime: true,
+        asset: { select: { assetTag: true } },
+      },
+    });
+    bookingHours = bookings.reduce(
+      (acc, booking) => {
+        const tag = booking.asset.assetTag;
+        acc[tag] = (acc[tag] ?? 0) + (booking.endTime.getTime() - booking.startTime.getTime()) / 3600000;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+  }
 
   return {
     title: "Asset Utilization",
@@ -384,14 +462,9 @@ async function assetUtilizationReport(
       asset: `${asset.assetTag} - ${asset.name}`,
       category: asset.category.name,
       status: asset.status,
-      allocations: asset.allocations.length,
-      bookings: asset.bookings.length,
-      bookedHours: roundOne(
-        asset.bookings.reduce(
-          (sum, booking) => sum + (booking.endTime.getTime() - booking.startTime.getTime()) / 3600000,
-          0
-        )
-      ),
+      allocations: asset._count.allocations,
+      bookings: asset._count.bookings,
+      bookedHours: roundOne(bookingHours[asset.assetTag] ?? 0),
     })),
   };
 }

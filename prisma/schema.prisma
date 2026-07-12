@@ -7,8 +7,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -119,6 +120,9 @@ model Employee {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([role, status])
+  @@index([departmentId, status])
 }
 
 model Department {
@@ -140,6 +144,9 @@ model Department {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([headId])
+  @@index([parentId])
 }
 
 model AssetCategory {
@@ -220,6 +227,8 @@ model Allocation {
   @@index([assetId])
   @@index([status])
   @@index([expectedReturnDate])
+  @@index([holderId, status])
+  @@index([departmentId, status])
 }
 
 model Transfer {
@@ -246,6 +255,8 @@ model Transfer {
 
   @@index([assetId])
   @@index([status])
+  @@index([requestedById])
+  @@index([toEmployeeId])
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -274,6 +285,8 @@ model Booking {
 
   @@index([assetId, startTime, endTime]) // overlap queries
   @@index([status])
+  @@index([bookedById])
+  @@index([departmentId])
 }
 
 model MaintenanceRequest {
@@ -303,6 +316,7 @@ model MaintenanceRequest {
 
   @@index([assetId])
   @@index([status])
+  @@index([raisedById, status])
 }
 
 model AuditCycle {
@@ -373,7 +387,7 @@ model Notification {
 
   createdAt DateTime @default(now())
 
-  @@index([userId, isRead])
+  @@index([userId, isRead, createdAt])
 }
 
 model ActivityLog {

@@ -23,7 +23,6 @@ export type AssetFilters = {
 };
 
 type SearchSource = URLSearchParams | Record<string, string | string[] | undefined>;
-type AssetWhere = any;
 type AssetTagClient = {
   asset: {
     findFirst(args: unknown): Promise<{ assetTag: string } | null>;
@@ -67,8 +66,8 @@ export function parseAssetFilters(source: SearchSource): AssetFilters {
   };
 }
 
-export function buildAssetWhere(filters: AssetFilters): AssetWhere {
-  const clauses: AssetWhere[] = [];
+export function buildAssetWhere(filters: AssetFilters) {
+  const clauses: Record<string, unknown>[] = [];
 
   if (filters.tag) clauses.push({ assetTag: { contains: filters.tag, mode: "insensitive" } });
   if (filters.serial) clauses.push({ serialNumber: { contains: filters.serial, mode: "insensitive" } });
@@ -89,12 +88,22 @@ export function buildAssetWhere(filters: AssetFilters): AssetWhere {
   return clauses.length ? { AND: clauses } : {};
 }
 
-export async function listAssets(filters: AssetFilters) {
+export async function listAssets(
+  filters: AssetFilters,
+  opts?: { skip?: number; take?: number }
+) {
+  const where = buildAssetWhere(filters);
   return prisma.asset.findMany({
-    where: buildAssetWhere(filters),
+    where,
     include: assetListInclude,
     orderBy: [{ createdAt: "desc" }, { assetTag: "desc" }],
+    skip: opts?.skip,
+    take: opts?.take,
   });
+}
+
+export async function countAssets(filters: AssetFilters) {
+  return prisma.asset.count({ where: buildAssetWhere(filters) });
 }
 
 export async function nextAssetTag(tx: AssetTagClient) {

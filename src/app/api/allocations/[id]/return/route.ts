@@ -18,7 +18,7 @@ export const POST = handle(async (req, ctx) => {
   const existing = await prisma.allocation.findFirst({
     where: { id, status: "ACTIVE" },
     include: {
-      asset: { select: { id: true, name: true, assetTag: true } },
+      asset: { select: { id: true, name: true, assetTag: true, status: true } },
       holder: { select: { id: true, name: true } },
       department: { select: { id: true, name: true } },
     },
@@ -46,6 +46,7 @@ export const POST = handle(async (req, ctx) => {
       actorId: session.sub,
       reason: "return",
       tx,
+      currentStatus: existing.asset.status,
     });
 
     return updated;
