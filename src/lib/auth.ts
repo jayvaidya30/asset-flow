@@ -1,4 +1,3 @@
-import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import type { Role } from "@prisma/client";
 
@@ -14,10 +13,12 @@ export interface SessionPayload {
 }
 
 export async function hashPassword(plain: string): Promise<string> {
+  const bcrypt = await import("bcryptjs");
   return bcrypt.hash(plain, 10);
 }
 
 export async function verifyPassword(plain: string, hash: string): Promise<boolean> {
+  const bcrypt = await import("bcryptjs");
   return bcrypt.compare(plain, hash);
 }
 
