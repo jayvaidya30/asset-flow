@@ -34,6 +34,9 @@ export function handle(
     } catch (err) {
       if (err instanceof AuthError) return fail(err.message, err.status);
       if (err instanceof ZodError) return fail("Validation failed", 422, err.flatten());
+      if (err instanceof Error && "status" in err && typeof (err as { status?: unknown }).status === "number") {
+        return fail(err.message, (err as { status: number }).status);
+      }
       console.error("[api] unhandled error:", err);
       return fail("Internal server error", 500);
     }

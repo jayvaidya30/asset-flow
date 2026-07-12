@@ -1,7 +1,7 @@
 import { clearSession } from "@/lib/session";
-import { handle, ok } from "@/lib/api";
+import { redirect } from "next/navigation";
 
-export const POST = handle(async () => {
+export async function POST() {
   await clearSession();
-  return ok({ loggedOut: true });
-});
+  redirect("/login");
+}

@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import type { Prisma } from "@prisma/client";
 
 /**
  * Single entry point for creating notifications. Every track calls this instead
@@ -25,9 +26,10 @@ export async function notify(
   userId: string,
   type: NotificationType,
   message: string,
-  opts?: { title?: string; linkUrl?: string }
+  opts?: { title?: string; linkUrl?: string; tx?: Prisma.TransactionClient }
 ) {
-  return prisma.notification.create({
+  const client = opts?.tx ?? prisma;
+  return client.notification.create({
     data: {
       userId,
       type,
@@ -43,10 +45,11 @@ export async function notifyMany(
   userIds: string[],
   type: NotificationType,
   message: string,
-  opts?: { title?: string; linkUrl?: string }
+  opts?: { title?: string; linkUrl?: string; tx?: Prisma.TransactionClient }
 ) {
   if (!userIds.length) return;
-  await prisma.notification.createMany({
+  const client = opts?.tx ?? prisma;
+  await client.notification.createMany({
     data: userIds.map((userId) => ({
       userId,
       type,
