@@ -36,10 +36,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           ))}
         </nav>
         <form action="/api/auth/logout" method="post" className="mt-8">
-          {/* Wire logout as a client action in Track 1; placeholder link for now. */}
-          <a href="/login" className="text-sm text-muted-foreground hover:underline">
+          <button type="submit" className="text-sm text-muted-foreground hover:underline">
             Sign out
-          </a>
+          </button>
         </form>
       </aside>
       <main className="flex-1 p-8">{children}</main>
