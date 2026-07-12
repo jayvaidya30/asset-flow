@@ -25,7 +25,7 @@ const ALLOWED: Record<AssetStatus, AssetStatus[]> = {
     AssetStatus.RETIRED,
   ],
   ALLOCATED: [AssetStatus.AVAILABLE, AssetStatus.UNDER_MAINTENANCE, AssetStatus.LOST],
-  RESERVED: [AssetStatus.AVAILABLE, AssetStatus.ALLOCATED],
+  RESERVED: [AssetStatus.AVAILABLE, AssetStatus.ALLOCATED, AssetStatus.LOST],
   UNDER_MAINTENANCE: [AssetStatus.AVAILABLE, AssetStatus.RETIRED, AssetStatus.DISPOSED],
   LOST: [AssetStatus.AVAILABLE, AssetStatus.DISPOSED],
   RETIRED: [AssetStatus.DISPOSED],
@@ -62,11 +62,14 @@ export async function transitionAsset(
   const updated = await client.asset.update({ where: { id: assetId }, data: { status: to } });
 
   // Log outside/inside tx as provided.
-  await logActivity(opts?.actorId ?? null, "ASSET_STATUS_CHANGED", "Asset", assetId, {
-    from: asset.status,
-    to,
-    reason: opts?.reason,
-  });
+  await logActivity(
+    opts?.actorId ?? null,
+    "ASSET_STATUS_CHANGED",
+    "Asset",
+    assetId,
+    { from: asset.status, to, reason: opts?.reason },
+    opts?.tx
+  );
 
   return updated;
 }
