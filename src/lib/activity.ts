@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import type { Prisma } from "@prisma/client";
 
 /**
  * Single entry point for the audit/activity log. Call after any state-changing
@@ -13,9 +14,11 @@ export async function logActivity(
   action: string,
   entityType: string,
   entityId?: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  tx?: Prisma.TransactionClient
 ) {
-  return prisma.activityLog.create({
+  const client = tx ?? prisma;
+  return client.activityLog.create({
     data: {
       actorId: actorId ?? undefined,
       action,

@@ -11,7 +11,7 @@ const NAV: { href: string; label: string; roles?: SessionPayload["role"][] }[] =
   { href: "/allocations", label: "Allocations" },
   { href: "/bookings", label: "Bookings" },
   { href: "/maintenance", label: "Maintenance" },
-  { href: "/audits", label: "Audits", roles: ["ADMIN", "ASSET_MANAGER"] },
+  { href: "/audits", label: "Audits" },
   { href: "/reports", label: "Reports", roles: ["ADMIN", "ASSET_MANAGER", "DEPARTMENT_HEAD"] },
   { href: "/notifications", label: "Notifications" },
 ];
