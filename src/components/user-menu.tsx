@@ -27,7 +27,7 @@ function prettyRole(role: string) {
 
 export function UserMenu({ name, email, role }: { name: string; email: string; role: string }) {
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger className="flex items-center gap-2 rounded-md p-1 pr-2 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring">
         <span className="flex size-8 items-center justify-center rounded-full bg-brand/10 text-xs font-semibold text-brand">
           {initials(name)}
@@ -53,17 +53,17 @@ export function UserMenu({ name, email, role }: { name: string; email: string; r
           {prettyRole(role)}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <form action="/api/auth/logout" method="post">
-          <DropdownMenuItem asChild>
-            <button
-              type="submit"
-              className="w-full text-destructive focus:bg-destructive/10 focus:text-destructive"
-            >
-              <LogOut className="!text-destructive" />
-              Sign out
-            </button>
-          </DropdownMenuItem>
-        </form>
+        <DropdownMenuItem
+          onSelect={() => {
+            fetch("/api/auth/logout", { method: "POST" }).finally(() => {
+              window.location.href = "/login";
+            });
+          }}
+          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+        >
+          <LogOut className="!text-destructive" />
+          Sign out
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
