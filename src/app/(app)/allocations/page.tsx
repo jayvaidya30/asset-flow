@@ -9,6 +9,7 @@ import { holderLabel, isOverdue, listActiveAllocations } from "@/lib/allocations
 import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/rbac";
 import { getSession } from "@/lib/session";
+import type { Prisma } from "@prisma/client";
 
 type AllocationRow = {
   id: string;
@@ -59,7 +60,7 @@ export default async function Page() {
   const canAllocate = hasRole(session, "ASSET_MANAGER", "DEPARTMENT_HEAD");
   const canReturn = hasRole(session, "ASSET_MANAGER");
   const canApproveTransfer = hasRole(session, "ASSET_MANAGER", "DEPARTMENT_HEAD");
-  const transferWhere = canApproveTransfer
+  const transferWhere: Prisma.TransferWhereInput = canApproveTransfer
     ? { status: "REQUESTED" }
     : {
         status: "REQUESTED",
