@@ -4,42 +4,137 @@
 
 @layer base {
   :root {
+    /* Operations Console — light. Ink primary, indigo brand accent, cool zinc neutrals. */
     --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --foreground: 240 10% 4%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 221 83% 53%;
-    --radius: 0.5rem;
+    --card-foreground: 240 10% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
+
+    --primary: 240 6% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+
+    /* Brand accent — used for active nav, focus rings, links, data highlights. */
+    --brand: 243 75% 58%;
+    --brand-foreground: 0 0% 100%;
+    --brand-muted: 243 75% 96%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Semantic status scale (asset lifecycle + alerts). */
+    --success: 142 66% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 45%;
+    --warning-foreground: 40 96% 10%;
+    --info: 243 75% 58%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 243 75% 58%;
+    --radius: 0.625rem;
+
+    /* Sidebar surface. */
+    --sidebar: 240 20% 99%;
+    --sidebar-foreground: 240 10% 4%;
+    --sidebar-border: 240 6% 92%;
+    --sidebar-accent: 240 5% 95%;
+    --sidebar-accent-foreground: 240 6% 10%;
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 13%;
-    --card-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
-    --secondary: 217 33% 18%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 18%;
-    --muted-foreground: 215 20% 65%;
-    --border: 217 33% 20%;
-    --input: 217 33% 20%;
-    --ring: 217 91% 60%;
+    /* Operations Console — dark. Near-black zinc, inverted (near-white) primary. */
+    --background: 240 10% 4%;
+    --foreground: 0 0% 96%;
+    --card: 240 8% 6%;
+    --card-foreground: 0 0% 96%;
+    --popover: 240 9% 7%;
+    --popover-foreground: 0 0% 96%;
+
+    --primary: 0 0% 96%;
+    --primary-foreground: 240 6% 10%;
+    --secondary: 240 5% 13%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 240 5% 13%;
+    --muted-foreground: 240 5% 62%;
+    --accent: 240 5% 15%;
+    --accent-foreground: 0 0% 96%;
+
+    --brand: 243 82% 70%;
+    --brand-foreground: 240 30% 8%;
+    --brand-muted: 243 40% 16%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    --success: 142 60% 48%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 58%;
+    --warning-foreground: 40 96% 10%;
+    --info: 243 82% 70%;
+    --info-foreground: 240 30% 8%;
+
+    --border: 240 5% 16%;
+    --input: 240 5% 18%;
+    --ring: 243 82% 70%;
+
+    --sidebar: 240 9% 5%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-border: 240 5% 14%;
+    --sidebar-accent: 240 5% 13%;
+    --sidebar-accent-foreground: 0 0% 96%;
   }
 
   * {
     @apply border-border;
   }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: hsl(var(--brand) / 0.18);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Tabular figures wherever numbers are compared in tables. */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  /* Subtle grid texture for hero/brand surfaces. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.6) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.6) 1px, transparent 1px);
+    background-size: 44px 44px;
   }
 }

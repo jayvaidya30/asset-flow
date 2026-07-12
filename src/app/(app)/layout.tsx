@@ -1,47 +1,40 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { hasRole } from "@/lib/rbac";
-import type { SessionPayload } from "@/lib/auth";
-
-// Shared authenticated shell (Track 1). Nav links are role-filtered.
-const NAV: { href: string; label: string; roles?: SessionPayload["role"][] }[] = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/setup", label: "Org Setup", roles: ["ADMIN"] },
-  { href: "/assets", label: "Assets" },
-  { href: "/allocations", label: "Allocations" },
-  { href: "/bookings", label: "Bookings" },
-  { href: "/maintenance", label: "Maintenance" },
-  { href: "/audits", label: "Audits" },
-  { href: "/reports", label: "Reports", roles: ["ADMIN", "ASSET_MANAGER", "DEPARTMENT_HEAD"] },
-  { href: "/notifications", label: "Notifications" },
-];
+import { Brand } from "@/components/brand";
+import { SidebarNav } from "@/components/sidebar-nav";
+import { TopBar } from "@/components/top-bar";
+import type { Role } from "@/components/nav-config";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-  const links = NAV.filter((l) => !l.roles || hasRole(session, ...l.roles));
+  if (!session) redirect("/login");
+
+  const user = { name: session.name, email: session.email, role: session.role as Role };
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="w-56 border-r bg-card p-4">
-        <div className="mb-6 text-lg font-bold">AssetFlow</div>
-        <nav className="space-y-1">
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="block rounded-md px-3 py-2 text-sm hover:bg-secondary"
-            >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
-        <form action="/api/auth/logout" method="post" className="mt-8">
-          <button type="submit" className="text-sm text-muted-foreground hover:underline">
-            Sign out
-          </button>
-        </form>
+    <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
+      {/* Desktop sidebar */}
+      <aside className="sticky top-0 hidden h-screen flex-col border-r border-sidebar-border bg-sidebar lg:flex">
+        <div className="flex h-14 items-center border-b border-sidebar-border px-4">
+          <Brand />
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">
+          <SidebarNav role={user.role} />
+        </div>
+        <div className="border-t border-sidebar-border p-3">
+          <p className="px-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">
+            v1.0 · Hackathon build
+          </p>
+        </div>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+
+      {/* Content column */}
+      <div className="flex min-h-screen flex-col">
+        <TopBar user={user} />
+        <main className="flex-1 px-4 py-6 md:px-6 lg:px-8">
+          <div className="mx-auto w-full max-w-6xl animate-fade-in">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

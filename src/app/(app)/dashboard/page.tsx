@@ -1,11 +1,49 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  Bell,
+  CalendarClock,
+  CheckCircle2,
+  Clock,
+  PackagePlus,
+  Send,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 import { getSession } from "@/lib/session";
 import { getDashboardKpis } from "@/lib/insights";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AssetTag } from "@/components/ui/asset-tag";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+
+type Tone = "brand" | "success" | "warning" | "neutral";
+
+const toneTile: Record<Tone, string> = {
+  brand: "bg-brand/10 text-brand",
+  success: "bg-success/10 text-success",
+  warning: "bg-warning/15 text-warning",
+  neutral: "bg-muted text-muted-foreground",
+};
+
+const KPI_META: Record<string, { icon: LucideIcon; tone: Tone; href?: string }> = {
+  assetsAvailable: { icon: CheckCircle2, tone: "success", href: "/assets" },
+  assetsAllocated: { icon: ArrowLeftRight, tone: "brand", href: "/allocations" },
+  maintenanceToday: { icon: Wrench, tone: "warning", href: "/maintenance" },
+  activeBookings: { icon: CalendarClock, tone: "brand", href: "/bookings" },
+  pendingTransfers: { icon: Send, tone: "warning", href: "/allocations" },
+  upcomingReturns: { icon: Clock, tone: "neutral", href: "/allocations" },
+};
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -17,62 +55,61 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             {dashboard.scopeLabel} · {session.name} · {prettyRole(session.role)}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline">
-            <Link href="/assets">Register Asset</Link>
+            <Link href="/assets">
+              <PackagePlus /> Register asset
+            </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href="/bookings">Book Resource</Link>
+            <Link href="/bookings">
+              <CalendarClock /> Book resource
+            </Link>
           </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/maintenance">Raise Maintenance</Link>
+          <Button asChild size="sm">
+            <Link href="/maintenance">
+              <Wrench /> Raise maintenance
+            </Link>
           </Button>
         </div>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {dashboard.kpis.map((kpi) => (
-          <Card key={kpi.key}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{kpi.label}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{kpi.value}</p>
-            </CardContent>
-          </Card>
-        ))}
-        <Card className={dashboard.overdueReturns ? "border-red-200 bg-red-50" : ""}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Overdue Returns</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-end justify-between gap-3">
-            <p className={dashboard.overdueReturns ? "text-3xl font-bold text-red-700" : "text-3xl font-bold"}>
-              {dashboard.overdueReturns}
-            </p>
-            {dashboard.overdueReturns > 0 && <Badge variant="destructive">Needs action</Badge>}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Unread Notifications</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-end justify-between gap-3">
-            <p className="text-3xl font-bold">{dashboard.unreadNotifications}</p>
-            <Button asChild size="sm" variant="ghost">
-              <Link href="/notifications">Open</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      {/* KPI grid */}
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {dashboard.kpis.map((kpi) => {
+          const meta = KPI_META[kpi.key] ?? { icon: CheckCircle2, tone: "neutral" as Tone };
+          return <MetricCard key={kpi.key} label={kpi.label} value={kpi.value} {...meta} />;
+        })}
+
+        <MetricCard
+          label="Overdue Returns"
+          value={dashboard.overdueReturns}
+          icon={AlertTriangle}
+          tone="warning"
+          href="/allocations"
+          alert={dashboard.overdueReturns > 0}
+        />
+        <MetricCard
+          label="Unread Notifications"
+          value={dashboard.unreadNotifications}
+          icon={Bell}
+          tone="brand"
+          href="/notifications"
+        />
       </section>
 
+      {/* Activity */}
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Recent Activity</h2>
+          <div>
+            <h2 className="text-base font-semibold">Recent activity</h2>
+            <p className="text-sm text-muted-foreground">The latest state changes across your scope.</p>
+          </div>
           <Button asChild size="sm" variant="ghost">
             <Link href="/notifications">View all</Link>
           </Button>
@@ -93,12 +130,18 @@ export default async function DashboardPage() {
                   {dashboard.recentActivity.map((activity) => (
                     <TableRow key={activity.id}>
                       <TableCell className="font-medium">{prettyAction(activity.action)}</TableCell>
-                      <TableCell>{activity.actor?.name ?? "System"}</TableCell>
-                      <TableCell>
-                        {activity.entityType}
-                        {activity.entityId ? <span className="text-muted-foreground"> · {shortId(activity.entityId)}</span> : null}
+                      <TableCell className="text-muted-foreground">
+                        {activity.actor?.name ?? "System"}
                       </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
+                      <TableCell>
+                        <span className="text-muted-foreground">{activity.entityType}</span>
+                        {activity.entityId ? (
+                          <AssetTag muted className="ml-2">
+                            {shortId(activity.entityId)}
+                          </AssetTag>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground tabular-nums">
                         {formatDateTime(activity.createdAt)}
                       </TableCell>
                     </TableRow>
@@ -106,11 +149,83 @@ export default async function DashboardPage() {
                 </TableBody>
               </Table>
             ) : (
-              <div className="p-6 text-sm text-muted-foreground">No activity has been recorded yet.</div>
+              <EmptyState />
             )}
           </CardContent>
         </Card>
       </section>
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  icon: Icon,
+  tone,
+  href,
+  alert,
+}: {
+  label: string;
+  value: number;
+  icon: LucideIcon;
+  tone: Tone;
+  href?: string;
+  alert?: boolean;
+}) {
+  const inner = (
+    <Card
+      className={cn(
+        "h-full transition-colors",
+        href && "hover:border-brand/40",
+        alert && "border-destructive/40 bg-destructive/[0.04]"
+      )}
+    >
+      <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </CardTitle>
+        <span
+          className={cn(
+            "flex size-8 items-center justify-center rounded-md",
+            alert ? "bg-destructive/10 text-destructive" : toneTile[tone]
+          )}
+        >
+          <Icon className="size-4" />
+        </span>
+      </CardHeader>
+      <CardContent>
+        <p
+          className={cn(
+            "text-3xl font-semibold tabular-nums tracking-tight",
+            alert && "text-destructive"
+          )}
+        >
+          {value}
+        </p>
+      </CardContent>
+    </Card>
+  );
+
+  return href ? (
+    <Link href={href} className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      {inner}
+    </Link>
+  ) : (
+    inner
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center gap-1 px-6 py-14 text-center">
+      <div className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <Clock className="size-5" />
+      </div>
+      <p className="mt-2 text-sm font-medium">No activity yet</p>
+      <p className="text-sm text-muted-foreground">
+        Actions across assets, bookings and audits will appear here.
+      </p>
     </div>
   );
 }

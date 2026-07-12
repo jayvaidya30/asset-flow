@@ -1,10 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AlertCircle, ArrowRight } from "lucide-react";
+import { AuthShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 
 // Track 1. Signup only ever creates an EMPLOYEE (no role picker — see spec).
 export default function SignupPage() {
@@ -33,30 +36,70 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Create account</CardTitle>
-          <p className="text-sm text-muted-foreground">You'll join as an Employee.</p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="space-y-4">
-            <Input placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            <Input type="email" placeholder="you@company.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-            <Input type="password" placeholder="Password (min 8 chars)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating…" : "Create account"}
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Have an account?{" "}
-            <a href="/login" className="text-primary underline">
-              Sign in
-            </a>
-          </p>
-        </CardContent>
-      </Card>
-    </main>
+    <AuthShell>
+      <div className="space-y-1.5">
+        <h2 className="text-2xl font-semibold tracking-tight">Create account</h2>
+        <p className="text-sm text-muted-foreground">
+          You&apos;ll join as an Employee. An admin can promote your role later.
+        </p>
+      </div>
+
+      <form onSubmit={onSubmit} className="mt-8 space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="name">Full name</Label>
+          <Input
+            id="name"
+            autoComplete="name"
+            placeholder="Ada Lovelace"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@company.com"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="At least 8 characters"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            required
+          />
+        </div>
+
+        {error && (
+          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "Creating…" : "Create account"}
+          {!loading && <ArrowRight />}
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        Have an account?{" "}
+        <Link href="/login" className="font-medium text-brand hover:underline">
+          Sign in
+        </Link>
+      </p>
+    </AuthShell>
   );
 }

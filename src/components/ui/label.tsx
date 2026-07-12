@@ -1,0 +1,26 @@
+import * as React from "react";
+import { cn } from "@/lib/utils";
+
+export const Label = React.forwardRef<HTMLLabelElement, React.LabelHTMLAttributes<HTMLLabelElement>>(
+  ({ className, ...props }, ref) => (
+    <label
+      ref={ref}
+      className={cn(
+        "text-sm font-medium leading-none text-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+        className
+      )}
+      {...props}
+    />
+  )
+);
+Label.displayName = "Label";
+
+/** Small uppercase field caption used across forms and filters. */
+export function FieldLabel({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) {
+  return (
+    <span
+      className={cn("text-[11px] font-medium uppercase tracking-wider text-muted-foreground", className)}
+      {...props}
+    />
+  );
+}

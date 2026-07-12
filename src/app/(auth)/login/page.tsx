@@ -1,10 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AlertCircle, ArrowRight } from "lucide-react";
+import { AuthShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,29 +36,62 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">AssetFlow</CardTitle>
-          <p className="text-sm text-muted-foreground">Sign in to your account</p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="space-y-4">
-            <Input type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in…" : "Sign in"}
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            No account?{" "}
-            <a href="/signup" className="text-primary underline">
-              Sign up
-            </a>
-          </p>
-        </CardContent>
-      </Card>
-    </main>
+    <AuthShell>
+      <div className="space-y-1.5">
+        <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
+        <p className="text-sm text-muted-foreground">Welcome back. Enter your credentials to continue.</p>
+      </div>
+
+      <form onSubmit={onSubmit} className="mt-8 space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+
+        {error && (
+          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "Signing in…" : "Sign in"}
+          {!loading && <ArrowRight />}
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        No account?{" "}
+        <Link href="/signup" className="font-medium text-brand hover:underline">
+          Create one
+        </Link>
+      </p>
+
+      <div className="mt-6 rounded-md border border-dashed bg-muted/40 px-3 py-2.5 text-center text-xs text-muted-foreground">
+        Demo · <span className="font-mono">admin@assetflow.dev</span> ·{" "}
+        <span className="font-mono">Password123!</span>
+      </div>
+    </AuthShell>
   );
 }

@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { getActivity, getNotifications } from "@/lib/insights";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AssetTag } from "@/components/ui/asset-tag";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MarkAllReadButton, MarkNotificationReadButton } from "./notification-actions";
 
@@ -20,8 +21,8 @@ export default async function NotificationsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Activity & Notifications</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight">Activity &amp; Notifications</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             {unreadCount} unread · {notifications.length} total
           </p>
         </div>
@@ -40,15 +41,18 @@ export default async function NotificationsPage() {
                   key={notification.id}
                   className={
                     notification.isRead
-                      ? "rounded-md border p-4"
-                      : "rounded-md border border-primary/30 bg-primary/5 p-4"
+                      ? "rounded-lg border p-4"
+                      : "rounded-lg border border-brand/30 bg-brand/5 p-4"
                   }
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
+                        {!notification.isRead && (
+                          <span className="size-1.5 shrink-0 rounded-full bg-brand" aria-hidden />
+                        )}
                         <h2 className="font-medium">{notification.title}</h2>
-                        <Badge variant={notification.isRead ? "outline" : "default"}>
+                        <Badge variant={notification.isRead ? "outline" : "brand"}>
                           {prettyType(notification.type)}
                         </Badge>
                       </div>
@@ -89,9 +93,9 @@ export default async function NotificationsPage() {
                     <TableRow key={item.id}>
                       <TableCell>
                         <div className="font-medium">{prettyType(item.action)}</div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                           {item.entityType}
-                          {item.entityId ? ` · ${item.entityId.slice(0, 8)}` : ""}
+                          {item.entityId ? <AssetTag muted>{item.entityId.slice(0, 8)}</AssetTag> : null}
                         </div>
                       </TableCell>
                       <TableCell>{item.actor?.name ?? "System"}</TableCell>

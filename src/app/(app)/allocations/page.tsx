@@ -5,6 +5,16 @@ import {
   TransferRequestForm,
 } from "./allocation-actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AssetTag } from "@/components/ui/asset-tag";
+import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { holderLabel, isOverdue, listActiveAllocations } from "@/lib/allocations";
 import { prisma } from "@/lib/db";
 import { hasRole } from "@/lib/rbac";
@@ -129,19 +139,21 @@ export default async function Page() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Allocations & Returns</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight">Allocations &amp; Returns</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Assign assets to employees or departments, block double-holds, and close returns with condition notes.
           </p>
         </div>
-        <div className="grid grid-cols-2 overflow-hidden rounded-md border text-sm">
-          <div className="px-3 py-2">
+        <div className="grid grid-cols-2 divide-x overflow-hidden rounded-lg border text-sm">
+          <div className="px-4 py-2">
             <div className="text-xs text-muted-foreground">Active</div>
-            <div className="font-semibold">{allocations.length}</div>
+            <div className="text-lg font-semibold tabular-nums">{allocations.length}</div>
           </div>
-          <div className="border-l px-3 py-2">
+          <div className="px-4 py-2">
             <div className="text-xs text-muted-foreground">Overdue</div>
-            <div className={overdueCount ? "font-semibold text-red-600" : "font-semibold"}>{overdueCount}</div>
+            <div className={overdueCount ? "text-lg font-semibold tabular-nums text-destructive" : "text-lg font-semibold tabular-nums"}>
+              {overdueCount}
+            </div>
           </div>
         </div>
       </div>
@@ -170,65 +182,60 @@ export default async function Page() {
         <CardHeader>
           <CardTitle>Pending Transfers</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-secondary text-xs uppercase text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3">Asset</th>
-                  <th className="px-4 py-3">From</th>
-                  <th className="px-4 py-3">To</th>
-                  <th className="px-4 py-3">Requested</th>
-                  <th className="px-4 py-3">Reason</th>
-                  {canApproveTransfer ? <th className="px-4 py-3">Decision</th> : null}
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {transfers.map((transfer) => (
-                  <tr key={transfer.id} className="align-top">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{transfer.asset.name}</div>
-                      <div className="text-xs text-muted-foreground">{transfer.asset.assetTag}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {transfer.fromEmployee ? (
-                        <>
-                          <div>{transfer.fromEmployee.name}</div>
-                          <div className="text-xs text-muted-foreground">{transfer.fromEmployee.email}</div>
-                        </>
-                      ) : (
-                        "Department allocation"
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div>{transfer.toEmployee.name}</div>
-                      <div className="text-xs text-muted-foreground">{transfer.toEmployee.email}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div>{formatDateTime(transfer.createdAt)}</div>
-                      <div className="text-xs text-muted-foreground">By {transfer.requestedBy.name}</div>
-                    </td>
-                    <td className="px-4 py-3">{transfer.reason || "Not provided"}</td>
-                    {canApproveTransfer ? (
-                      <td className="px-4 py-3">
-                        <TransferDecisionForm transferId={transfer.id} />
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-                {!transfers.length ? (
-                  <tr>
-                    <td
-                      className="px-4 py-8 text-center text-muted-foreground"
-                      colSpan={canApproveTransfer ? 6 : 5}
-                    >
-                      No pending transfer requests.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Asset</TableHead>
+                <TableHead>From</TableHead>
+                <TableHead>To</TableHead>
+                <TableHead>Requested</TableHead>
+                <TableHead>Reason</TableHead>
+                {canApproveTransfer ? <TableHead>Decision</TableHead> : null}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transfers.map((transfer) => (
+                <TableRow key={transfer.id}>
+                  <TableCell>
+                    <div className="font-medium">{transfer.asset.name}</div>
+                    <AssetTag muted className="mt-1">{transfer.asset.assetTag}</AssetTag>
+                  </TableCell>
+                  <TableCell>
+                    {transfer.fromEmployee ? (
+                      <>
+                        <div>{transfer.fromEmployee.name}</div>
+                        <div className="text-xs text-muted-foreground">{transfer.fromEmployee.email}</div>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">Department allocation</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div>{transfer.toEmployee.name}</div>
+                    <div className="text-xs text-muted-foreground">{transfer.toEmployee.email}</div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="tabular-nums">{formatDateTime(transfer.createdAt)}</div>
+                    <div className="text-xs text-muted-foreground">By {transfer.requestedBy.name}</div>
+                  </TableCell>
+                  <TableCell className="max-w-56 text-muted-foreground">
+                    {transfer.reason || "Not provided"}
+                  </TableCell>
+                  {canApproveTransfer ? (
+                    <TableCell>
+                      <TransferDecisionForm transferId={transfer.id} />
+                    </TableCell>
+                  ) : null}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {!transfers.length ? (
+            <p className="px-5 py-10 text-center text-sm text-muted-foreground">
+              No pending transfer requests.
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -236,68 +243,64 @@ export default async function Page() {
         <CardHeader>
           <CardTitle>Active Allocations</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-secondary text-xs uppercase text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3">Asset</th>
-                  <th className="px-4 py-3">Holder</th>
-                  <th className="px-4 py-3">Allocated</th>
-                  <th className="px-4 py-3">Expected return</th>
-                  <th className="px-4 py-3">Location</th>
-                  {canReturn ? <th className="px-4 py-3">Return</th> : null}
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {allocations.map((allocation) => {
-                  const overdue = isOverdue(allocation.expectedReturnDate);
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Asset</TableHead>
+                <TableHead>Holder</TableHead>
+                <TableHead>Allocated</TableHead>
+                <TableHead>Expected return</TableHead>
+                <TableHead>Location</TableHead>
+                {canReturn ? <TableHead>Return</TableHead> : null}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {allocations.map((allocation) => {
+                const overdue = isOverdue(allocation.expectedReturnDate);
 
-                  return (
-                    <tr key={allocation.id} className={overdue ? "bg-red-50/60 align-top" : "align-top"}>
-                      <td className="px-4 py-3">
-                        <div className="font-medium">{allocation.asset.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {allocation.asset.assetTag} - {allocation.asset.category.name}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>{holderLabel(allocation)}</div>
-                        {allocation.holder ? (
-                          <div className="text-xs text-muted-foreground">{allocation.holder.email}</div>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>{formatDateTime(allocation.allocatedAt)}</div>
-                        <div className="text-xs text-muted-foreground">By {allocation.allocatedBy.name}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={overdue ? "font-medium text-red-700" : ""}>
-                          {formatDate(allocation.expectedReturnDate)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">{allocation.asset.location ?? "Not set"}</td>
-                      {canReturn ? (
-                        <td className="min-w-[360px] px-4 py-3">
-                          <ReturnAllocationForm allocationId={allocation.id} />
-                        </td>
+                return (
+                  <TableRow key={allocation.id} className={overdue ? "bg-destructive/[0.04]" : undefined}>
+                    <TableCell>
+                      <div className="font-medium">{allocation.asset.name}</div>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <AssetTag muted>{allocation.asset.assetTag}</AssetTag>
+                        <span className="text-xs text-muted-foreground">{allocation.asset.category.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>{holderLabel(allocation)}</div>
+                      {allocation.holder ? (
+                        <div className="text-xs text-muted-foreground">{allocation.holder.email}</div>
                       ) : null}
-                    </tr>
-                  );
-                })}
-                {!allocations.length ? (
-                  <tr>
-                    <td
-                      className="px-4 py-8 text-center text-muted-foreground"
-                      colSpan={canReturn ? 6 : 5}
-                    >
-                      No active allocations yet.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="tabular-nums">{formatDateTime(allocation.allocatedAt)}</div>
+                      <div className="text-xs text-muted-foreground">By {allocation.allocatedBy.name}</div>
+                    </TableCell>
+                    <TableCell>
+                      {overdue ? (
+                        <StatusBadge status="OVERDUE" label={`${formatDate(allocation.expectedReturnDate)}`} />
+                      ) : (
+                        <span className="tabular-nums">{formatDate(allocation.expectedReturnDate)}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{allocation.asset.location ?? "Not set"}</TableCell>
+                    {canReturn ? (
+                      <TableCell className="min-w-[360px]">
+                        <ReturnAllocationForm allocationId={allocation.id} />
+                      </TableCell>
+                    ) : null}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+          {!allocations.length ? (
+            <p className="px-5 py-10 text-center text-sm text-muted-foreground">
+              No active allocations yet.
+            </p>
+          ) : null}
         </CardContent>
       </Card>
     </div>
