@@ -8,7 +8,8 @@ const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password"];
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  // "/" is the public landing page (exact match only — never treat it as a prefix).
+  const isPublic = pathname === "/" || PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   const token = req.cookies.get(COOKIE_NAME)?.value;
   const session = token ? await verifySession(token) : null;
 
